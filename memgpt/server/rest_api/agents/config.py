@@ -26,8 +26,12 @@ class AgentRenameRequest(BaseModel):
 class GetAgentResponse(BaseModel):
     # config: dict = Field(..., description="The agent configuration object.")
     agent_state: AgentStateModel = Field(..., description="The state of the agent.")
-    sources: List[str] = Field(..., description="The list of data sources associated with the agent.")
-    last_run_at: Optional[int] = Field(None, description="The unix timestamp of when the agent was last run.")
+    sources: List[uuid.UUID] = Field(
+        ..., description="The list of data sources associated with the agent."
+    )
+    last_run_at: Optional[int] = Field(
+        None, description="The unix timestamp of when the agent was last run."
+    )
 
 
 def validate_agent_name(name: str) -> str:
@@ -35,7 +39,9 @@ def validate_agent_name(name: str) -> str:
 
     # Length check
     if not (1 <= len(name) <= 50):
-        raise HTTPException(status_code=400, detail="Name length must be between 1 and 50 characters.")
+        raise HTTPException(
+            status_code=400, detail="Name length must be between 1 and 50 characters."
+        )
 
     # Regex for allowed characters (alphanumeric, spaces, hyphens, underscores)
     if not re.match("^[A-Za-z0-9 _-]+$", name):
@@ -47,10 +53,14 @@ def validate_agent_name(name: str) -> str:
     return name
 
 
-def setup_agents_config_router(server: SyncServer, interface: QueuingInterface, password: str):
+def setup_agents_config_router(
+    server: SyncServer, interface: QueuingInterface, password: str
+):
     get_current_user_with_server = partial(partial(get_current_user, server), password)
 
-    @router.get("/agents/{agent_id}/config", tags=["agents"], response_model=GetAgentResponse)
+    @router.get(
+        "/agents/{agent_id}/config", tags=["agents"], response_model=GetAgentResponse
+    )
     def get_agent_config(
         agent_id: uuid.UUID,
         user_id: uuid.UUID = Depends(get_current_user_with_server),
@@ -64,7 +74,9 @@ def setup_agents_config_router(server: SyncServer, interface: QueuingInterface, 
         interface.clear()
         if not server.ms.get_agent(user_id=user_id, agent_id=agent_id):
             # agent does not exist
-            raise HTTPException(status_code=404, detail=f"Agent agent_id={agent_id} not found.")
+            raise HTTPException(
+                status_code=404, detail=f"Agent agent_id={agent_id} not found."
+            )
 
         agent_state = server.get_agent_config(user_id=user_id, agent_id=agent_id)
         # get sources
@@ -86,13 +98,17 @@ def setup_agents_config_router(server: SyncServer, interface: QueuingInterface, 
                 embedding_config=embedding_config,
                 state=agent_state.state,
                 created_at=int(agent_state.created_at.timestamp()),
-                functions_schema=agent_state.state["functions"],  # TODO: this is very error prone, jsut lookup the preset instead
+                functions_schema=agent_state.state[
+                    "functions"
+                ],  # TODO: this is very error prone, jsut lookup the preset instead
             ),
             last_run_at=None,  # TODO
             sources=attached_sources,
         )
 
-    @router.patch("/agents/{agent_id}/rename", tags=["agents"], response_model=GetAgentResponse)
+    @router.patch(
+        "/agents/{agent_id}/rename", tags=["agents"], response_model=GetAgentResponse
+    )
     def update_agent_name(
         agent_id: uuid.UUID,
         request: AgentRenameRequest = Body(...),
@@ -109,7 +125,9 @@ def setup_agents_config_router(server: SyncServer, interface: QueuingInterface, 
 
         interface.clear()
         try:
-            agent_state = server.rename_agent(user_id=user_id, agent_id=agent_id, new_agent_name=valid_name)
+            agent_state = server.rename_agent(
+                user_id=user_id, agent_id=agent_id, new_agent_name=valid_name
+            )
             # get sources
             attached_sources = server.list_attached_sources(agent_id=agent_id)
         except HTTPException:
@@ -131,7 +149,9 @@ def setup_agents_config_router(server: SyncServer, interface: QueuingInterface, 
                 embedding_config=embedding_config,
                 state=agent_state.state,
                 created_at=int(agent_state.created_at.timestamp()),
-                functions_schema=agent_state.state["functions"],  # TODO: this is very error prone, jsut lookup the preset instead
+                functions_schema=agent_state.state[
+                    "functions"
+                ],  # TODO: this is very error prone, jsut lookup the preset instead
             ),
             last_run_at=None,  # TODO
             sources=attached_sources,
@@ -150,7 +170,10 @@ def setup_agents_config_router(server: SyncServer, interface: QueuingInterface, 
         interface.clear()
         try:
             server.delete_agent(user_id=user_id, agent_id=agent_id)
-            return JSONResponse(status_code=status.HTTP_200_OK, content={"message": f"Agent agent_id={agent_id} successfully deleted"})
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"message": f"Agent agent_id={agent_id} successfully deleted"},
+            )
         except HTTPException:
             raise
         except Exception as e:
